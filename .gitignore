@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.env
+.DS_Store
+
+# Local Anki data must never be committed.
+*.anki2
+*.anki2-wal
+*.anki2-shm
+*.media
+*.collection.media/
+
+# Local runtime backups/logs.
+runtime/*.bak
+runtime/*.log

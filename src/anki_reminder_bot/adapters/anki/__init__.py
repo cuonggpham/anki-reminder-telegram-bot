@@ -1,0 +1,1 @@
+"""Official Anki library adapter."""
