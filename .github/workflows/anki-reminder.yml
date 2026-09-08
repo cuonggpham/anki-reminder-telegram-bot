@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: runtime-state
@@ -40,13 +40,8 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MINIAPP_URL: ${{ vars.MINIAPP_URL }}
+          RUNTIME_BACKEND: control_api
+          CONTROL_API_URL: ${{ secrets.CONTROL_API_URL }}
+          CONTROL_API_TOKEN: ${{ secrets.CONTROL_API_TOKEN }}
           RUNTIME_DIR: runtime
         run: PYTHONPATH=src python -m anki_reminder_bot.entrypoints.reminder_job
-
-      - name: Commit runtime state
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add runtime/config.json runtime/state.json
-          git diff --cached --quiet || git commit -m "chore: update runtime state [skip ci]"
-          git push

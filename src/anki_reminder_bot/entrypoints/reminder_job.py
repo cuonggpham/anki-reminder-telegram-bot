@@ -6,9 +6,9 @@ from anki_reminder_bot.entrypoints.common import app_now, build_components
 
 def main() -> None:
     _, repository, anki, telegram = build_components()
-    config = repository.load_config()
-    service = ReminderService(anki, telegram, repository)
     try:
+        config = repository.load_config()
+        service = ReminderService(anki, telegram, repository)
         sent = service.run(app_now(config.timezone))
         print(f"reminder_job completed; notification_sent={sent}")
     except Exception as exc:

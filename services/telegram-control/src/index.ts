@@ -244,6 +244,23 @@ async function handleInternal(request: Request, env: Env, url: URL): Promise<Res
     return json({ ok: true });
   }
 
+  if (request.method === "PUT" && url.pathname === "/internal/runtime/config") {
+    const body = (await request.json()) as Record<string, unknown>;
+    const settings = await loadSettings(env.DB, chatId);
+    settings.enabled = Boolean(body.enabled ?? settings.enabled);
+    settings.selectedDecks = Array.isArray(body.selected_decks)
+      ? body.selected_decks.map(String)
+      : settings.selectedDecks;
+    settings.reminderTimes = Array.isArray(body.reminder_times)
+      ? body.reminder_times.map(String)
+      : settings.reminderTimes;
+    settings.timezone = String(body.timezone ?? settings.timezone);
+    const language = String(body.language ?? settings.language);
+    if (language === "vi-en" || language === "en-vi") settings.language = language;
+    await saveSettings(env.DB, settings);
+    return json({ ok: true });
+  }
+
   if (request.method === "POST" && url.pathname === "/internal/decks") {
     const body = (await request.json()) as { decks?: string[] };
     const decks = [...new Set((body.decks ?? []).map(String))].sort();

@@ -13,6 +13,9 @@ class AppSettings:
     telegram_chat_id: int
     miniapp_url: str
     runtime_dir: Path
+    runtime_backend: str
+    control_api_url: str | None
+    control_api_token: str | None
 
     @classmethod
     def from_env(cls) -> "AppSettings":
@@ -37,4 +40,7 @@ class AppSettings:
             telegram_chat_id=chat_id,
             miniapp_url=required["MINIAPP_URL"] or "",
             runtime_dir=Path(os.getenv("RUNTIME_DIR", "runtime")),
+            runtime_backend=os.getenv("RUNTIME_BACKEND", "json"),
+            control_api_url=os.getenv("CONTROL_API_URL"),
+            control_api_token=os.getenv("CONTROL_API_TOKEN"),
         )
