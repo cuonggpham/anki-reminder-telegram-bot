@@ -19,8 +19,8 @@ Thiết kế dùng ports/adapters để sau này có thể thay Telegram API, pe
 - `All decks`, một deck, nhiều deck và subdeck.
 - Tối đa 5 reminder mỗi ngày.
 - Giờ tùy ý theo định dạng `HH:MM`.
-- Inline keyboard để cấu hình deck, giờ và bật/tắt reminder.
-- `/start`, `/status`, `/study`, `/settings`, `/times`.
+- Cấu hình trực tiếp trong `runtime/config.json`.
+- Telegram chỉ gửi notification và nút `Study Now` mở AnkiWeb.
 - Notification song ngữ Việt/Anh.
 - Gửi thông báo hoàn thành một lần mỗi ngày.
 - Cảnh báo khi sync hoặc Telegram API lỗi.
@@ -29,11 +29,11 @@ Thiết kế dùng ports/adapters để sau này có thể thay Telegram API, pe
 
 ### 1. Tạo bot Telegram
 
-Tạo bot bằng BotFather và lấy token. Chat ID phải là chat cá nhân duy nhất được phép dùng bot.
+Tạo bot bằng BotFather và lấy token. Chat ID phải là chat cá nhân duy nhất được phép nhận notification.
 
 ### 2. Tạo repository private
 
-Push project vào repository private. GitHub Actions cần quyền `Contents: Read and write` để cập nhật `runtime/config.json` và `runtime/state.json`.
+Push project vào repository private. GitHub Actions cần quyền `Contents: Read and write` để cập nhật `runtime/state.json`.
 
 ### 3. Thêm GitHub Secrets
 
@@ -54,14 +54,43 @@ MINIAPP_URL=https://<username>.github.io/<repository>/
 
 Trong repository settings, chọn Pages → Source: GitHub Actions. Workflow `pages.yml` sẽ deploy `miniapp/`.
 
-### 5. Chạy feasibility test
+### 5. Cấu hình runtime trực tiếp
+
+Chỉnh `runtime/config.json`:
+
+```json
+{
+  "enabled": true,
+  "selected_decks": ["*"],
+  "reminder_times": ["08:00", "18:00"],
+  "timezone": "Asia/Ho_Chi_Minh",
+  "language": "vi-en"
+}
+```
+
+Giá trị `selected_decks`:
+
+- `["*"]`: toàn bộ deck.
+- `["English"]`: deck `English` và các subdeck của nó.
+- `["English", "Japanese::N5"]`: nhiều deck.
+
+Sau khi chỉnh sửa:
+
+```bash
+git add runtime/config.json
+git commit -m "config: update reminder settings"
+git push
+```
+
+Tối đa 5 giờ reminder/ngày. Giờ dùng định dạng `HH:MM`.
+
+### 6. Chạy feasibility test
 
 Trước khi bật lịch tự động, chạy thủ công workflow `Anki reminder`. Đây là bước bắt buộc để kiểm tra phiên bản official Anki library và sync read-only.
 
-### 6. Cấu hình BotFather
+### 7. Cấu hình BotFather Mini App
 
-- Set commands theo danh sách trong `TelegramBotApi.set_commands()`.
-- Configure Main Mini App bằng URL GitHub Pages.
+Configure Main Mini App bằng URL GitHub Pages. Telegram chỉ dùng để nhận notification và mở AnkiWeb; bot không còn worker xử lý `/start`, `/settings` hoặc inline keyboard cấu hình.
 
 ## Local development
 
@@ -76,17 +105,19 @@ PYTHONPATH=src pytest
 
 ## Custom reminder time
 
-Trong bot, chọn `Custom time / Giờ tùy ý` rồi gửi:
+Sửa trường `reminder_times` trong `runtime/config.json`:
 
-```text
-08:15, 13:30, 21:45
+```json
+{
+  "reminder_times": ["08:15", "13:30", "21:45"]
+}
 ```
 
-Có thể đặt tối đa 5 giờ. Worker chạy theo chu kỳ 5 phút nên thời điểm gửi có thể lệch tối đa khoảng 5 phút.
+Có thể đặt tối đa 5 giờ. Worker chạy theo chu kỳ 5 phút nên thời điểm gửi có thể lệch tối đa khoảng 5 phút. Sau khi sửa file, commit và push lên branch `main`.
 
 ## Known limitations
 
 - GitHub Actions schedule có thể bị GitHub trì hoãn.
-- Telegram configuration polling không realtime; mục tiêu là tối đa khoảng 5 phút.
+- Không có giao diện cấu hình trực tiếp trong Telegram; thay đổi cấu hình cần commit `runtime/config.json`.
 - Anki Python library có phần API nội bộ; hiện pin ở phiên bản `26.8.1` và cần kiểm tra lại khi nâng version.
 - Mini App dùng top-level navigation tới AnkiWeb, không iframe và không lưu credentials.

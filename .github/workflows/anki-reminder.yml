@@ -47,6 +47,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add runtime/config.json runtime/state.json runtime/decks.json
+          git add runtime/config.json runtime/state.json
           git diff --cached --quiet || git commit -m "chore: update runtime state [skip ci]"
           git push

@@ -44,50 +44,6 @@ class TelegramBotApi:
             payload["reply_markup"] = reply_markup
         return self.call("sendMessage", payload)
 
-    def edit_message(self, message_id: int, text: str, reply_markup: dict | None = None) -> dict:
-        payload: dict[str, Any] = {
-            "chat_id": self.chat_id,
-            "message_id": message_id,
-            "text": text,
-        }
-        if reply_markup:
-            payload["reply_markup"] = reply_markup
-        return self.call("editMessageText", payload)
-
-    def answer_callback(self, callback_id: str, text: str | None = None) -> dict:
-        payload: dict[str, Any] = {"callback_query_id": callback_id}
-        if text:
-            payload["text"] = text
-        return self.call("answerCallbackQuery", payload)
-
-    def get_updates(self, offset: int, limit: int = 100) -> list[dict]:
-        return self.call("getUpdates", {"offset": offset, "limit": limit, "timeout": 0})
-
-    def set_commands(self) -> None:
-        self.call(
-            "setMyCommands",
-            {
-                "commands": [
-                    {"command": "start", "description": "Mở menu / Open menu"},
-                    {"command": "status", "description": "Xem trạng thái / View status"},
-                    {"command": "study", "description": "Học ngay / Study now"},
-                    {"command": "settings", "description": "Cấu hình / Settings"},
-                    {"command": "times", "description": "Đặt giờ / Set times"},
-                ]
-            },
-        )
-
-    def main_keyboard(self) -> dict:
-        return {
-            "inline_keyboard": [
-                [{"text": "⚙️ Cấu hình / Settings", "callback_data": "menu:settings"}],
-                [
-                    {"text": "📊 Trạng thái / Status", "callback_data": "menu:status"},
-                    {"text": "📖 Học ngay / Study", "web_app": {"url": self.miniapp_url}},
-                ],
-            ]
-        }
-
     def study_keyboard(self) -> dict:
         return {
             "inline_keyboard": [

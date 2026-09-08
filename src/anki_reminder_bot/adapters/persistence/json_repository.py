@@ -48,13 +48,3 @@ class JsonRuntimeRepository:
 
     def save_state(self, state: RuntimeState) -> None:
         self._write("state.json", state.to_dict())
-
-    def load_decks(self) -> list[str]:
-        payload = self._read("decks.json", {"decks": []})
-        return list(payload.get("decks") or [])
-
-    def save_decks(self, decks: list[str], updated_at: datetime) -> None:
-        self._write(
-            "decks.json",
-            {"decks": sorted(set(decks)), "updated_at": updated_at.isoformat()},
-        )

@@ -61,56 +61,24 @@ class ReminderConfig:
         if self.language not in SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language: {self.language}")
 
-    def toggle_deck(self, deck: str) -> None:
-        if deck == ALL_DECKS:
-            self.selected_decks = [ALL_DECKS]
-            return
-        if ALL_DECKS in self.selected_decks:
-            self.selected_decks = []
-        if deck in self.selected_decks:
-            self.selected_decks.remove(deck)
-        else:
-            self.selected_decks.append(deck)
-        if not self.selected_decks:
-            self.selected_decks = [ALL_DECKS]
-        self.validate()
-
-    def toggle_time(self, value: str) -> None:
-        parse_clock_time(value)
-        if value in self.reminder_times:
-            self.reminder_times.remove(value)
-        elif len(self.reminder_times) < 5:
-            self.reminder_times.append(value)
-            self.reminder_times.sort()
-        else:
-            raise ValueError("You can select at most five reminder times")
-        self.validate()
-
-
 @dataclass
 class RuntimeState:
-    telegram_update_offset: int = 0
     sent_slots: dict[str, str] = field(default_factory=dict)
     completion_sent_dates: list[str] = field(default_factory=list)
-    awaiting_input: str | None = None
     last_sync_at: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "RuntimeState":
         return cls(
-            telegram_update_offset=int(raw.get("telegram_update_offset", 0)),
             sent_slots=dict(raw.get("sent_slots") or {}),
             completion_sent_dates=list(raw.get("completion_sent_dates") or []),
-            awaiting_input=raw.get("awaiting_input"),
             last_sync_at=raw.get("last_sync_at"),
         )
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "telegram_update_offset": self.telegram_update_offset,
             "sent_slots": self.sent_slots,
             "completion_sent_dates": self.completion_sent_dates,
-            "awaiting_input": self.awaiting_input,
             "last_sync_at": self.last_sync_at,
         }
 
