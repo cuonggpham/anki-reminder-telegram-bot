@@ -102,7 +102,15 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
   const chatId = getChatId(update);
   if (chatId !== env.TELEGRAM_CHAT_ID) return json({ ok: true, ignored: true });
 
-  await processUpdate(update, env, chatId);
+  try {
+    await processUpdate(update, env, chatId);
+  } catch (error) {
+    // Let Telegram retry a failed delivery instead of permanently dropping it.
+    await env.DB.prepare("DELETE FROM processed_updates WHERE update_id = ?")
+      .bind(update.update_id)
+      .run();
+    throw error;
+  }
   return json({ ok: true });
 }
 
@@ -535,7 +543,7 @@ function toggleTime(selected: string[], value: string): string[] {
 function validateSettings(settings: Settings) {
   if (!settings.selectedDecks.length) throw new Error("At least one deck selection is required");
   if (settings.selectedDecks.includes(ALL_DECKS) && settings.selectedDecks.length > 1) throw new Error("Invalid deck selection");
-  if (settings.reminderTimes.length > 5 || settings.reminderTimes.some((value) => !isClockTime(value))) throw new Error("Invalid reminder times");
+  if (settings.reminderTimes.length < 1 || settings.reminderTimes.length > 5 || settings.reminderTimes.some((value) => !isClockTime(value))) throw new Error("Invalid reminder times");
   if (!["vi-en", "en-vi"].includes(settings.language)) throw new Error("Invalid language");
 }
 
