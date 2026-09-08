@@ -1,8 +1,10 @@
 # Anki Telegram Reminder Bot
 
-Bot Telegram single-user nhắc học AnkiWeb theo deck và lịch cấu hình trong Telegram.
+A single-user Telegram bot that sends AnkiWeb study reminders based on the selected decks and schedule configured in Telegram.
 
-## Kiến trúc
+This repository can be public. Never commit Anki credentials, Telegram bot tokens, API tokens, webhook secrets, or other private values. Store them in GitHub Actions Secrets or Cloudflare Worker secrets.
+
+## Architecture
 
 ```text
 Telegram
@@ -13,31 +15,31 @@ Cloudflare Worker + D1
    ▼
 GitHub Actions + Python + official anki package
    │
-   ├─ sync AnkiWeb
-   ├─ đọc thống kê
-   └─ gửi reminder Telegram
+   ├─ syncs AnkiWeb
+   ├─ reads study statistics
+   └─ sends Telegram reminders
 ```
 
-- Cloudflare Worker xử lý `/start`, `/settings`, `/status`, `/study` và inline keyboard.
-- D1 lưu cấu hình, trạng thái gửi, session Telegram và danh sách deck.
-- GitHub Actions chạy mỗi 5 phút; reminder có thể trễ tối đa khoảng 5 phút cộng với độ trễ cron của GitHub.
-- GitHub Actions không còn commit `runtime/config.json` hoặc `runtime/state.json`.
-- GitHub Pages host Mini App mở AnkiWeb trong Telegram WebView.
+- The Cloudflare Worker handles `/start`, `/settings`, `/status`, `/study`, and inline-keyboard interactions.
+- D1 stores user settings, reminder state, Telegram sessions, and the deck list.
+- GitHub Actions runs every five minutes. A reminder may be delayed by up to approximately five minutes, plus GitHub Actions scheduling latency.
+- GitHub Actions does not commit `runtime/config.json` or `runtime/state.json`; runtime state is stored through the control API.
+- GitHub Pages hosts a Mini App that opens AnkiWeb in Telegram's WebView.
 
-## Tính năng
+## Features
 
-- Single-user, chỉ chấp nhận `TELEGRAM_CHAT_ID` đã cấu hình.
-- `All decks`, một deck, nhiều deck và deck cha bao gồm subdeck.
-- Tối đa 5 reminder/ngày, giờ tùy ý theo `HH:MM`.
-- Cấu hình realtime bằng inline keyboard Telegram.
-- Song ngữ Việt/Anh.
-- Gửi `✅ Đã hoàn thành hôm nay` tối đa một lần/ngày.
-- Cảnh báo lỗi Anki sync hoặc Telegram API.
-- `/start`, `/status`, `/study`, `/settings`, `/cancel`, `/help`.
+- Single-user access restricted to the configured `TELEGRAM_CHAT_ID`.
+- Support for all decks, individual decks, multiple decks, and parent decks including subdecks.
+- Up to five reminders per day with custom `HH:MM` times.
+- Real-time configuration through Telegram inline keyboards.
+- Vietnamese/English bilingual messages.
+- Sends `✅ Completed today` at most once per day.
+- Reports Anki sync and Telegram API errors.
+- Commands: `/start`, `/status`, `/study`, `/settings`, `/cancel`, and `/help`.
 
-## 1. Chuẩn bị GitHub
+## 1. Prepare GitHub
 
-Repository nên để private. Thêm GitHub Secrets:
+Add these values as GitHub Actions Secrets:
 
 ```text
 ANKIWEB_EMAIL
@@ -50,17 +52,17 @@ CLOUDFLARE_API_TOKEN
 CLOUDFLARE_ACCOUNT_ID
 ```
 
-Thêm GitHub Actions Variable:
+Add this GitHub Actions Variable:
 
 ```text
 MINIAPP_URL=https://<username>.github.io/<repository>/
 ```
 
-`CLOUDFLARE_API_TOKEN` cần quyền deploy Worker và quản lý D1 database.
+The `CLOUDFLARE_API_TOKEN` must have permission to deploy the Worker and manage the D1 database.
 
-## 2. Tạo Cloudflare D1 và Worker
+## 2. Create the Cloudflare D1 database and Worker
 
-Cài Node.js 22+, sau đó:
+Install Node.js 22 or later, then run:
 
 ```bash
 cd services/telegram-control
@@ -69,13 +71,13 @@ npx wrangler login
 npx wrangler d1 create anki-reminder
 ```
 
-Copy `database_id` vào `services/telegram-control/wrangler.toml`, thay giá trị placeholder:
+Copy the generated `database_id` into `services/telegram-control/wrangler.toml`:
 
 ```toml
 database_id = "..."
 ```
 
-Áp dụng schema và deploy:
+Apply the schema and deploy the Worker:
 
 ```bash
 npm run db:migrations:remote
@@ -83,7 +85,7 @@ npm run typecheck
 npm run deploy
 ```
 
-Thiết lập Worker secrets:
+Set the Worker secrets:
 
 ```bash
 npx wrangler secret put TELEGRAM_BOT_TOKEN
@@ -93,11 +95,11 @@ npx wrangler secret put CONTROL_API_TOKEN
 npx wrangler secret put MINIAPP_URL
 ```
 
-`CONTROL_API_TOKEN` phải trùng với GitHub Secret cùng tên. `MINIAPP_URL` là URL GitHub Pages của Mini App.
+`CONTROL_API_TOKEN` must match the GitHub Actions Secret with the same name. `MINIAPP_URL` is the URL of the GitHub Pages Mini App.
 
-## 3. Đăng ký Telegram webhook
+## 3. Register the Telegram webhook
 
-Thay token, URL Worker và secret thật trước khi chạy:
+Replace the token, Worker URL, and secret with your actual values before running:
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
@@ -105,17 +107,17 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
   -d "secret_token=<WEBHOOK_SECRET>"
 ```
 
-Kiểm tra:
+Check the webhook status:
 
 ```bash
 curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 ```
 
-Sau khi bật webhook, không chạy `getUpdates`/polling cho bot này.
+After enabling the webhook, do not run `getUpdates` or polling for this bot.
 
-## 4. Import cấu hình hiện tại
+## 4. Import the current configuration
 
-Worker tự tạo cấu hình mặc định khi nhận request đầu tiên. Để giữ cấu hình đang có trong `runtime/config.json`, gọi:
+The Worker creates default settings when it receives its first request. To import the configuration from `runtime/config.json`, run:
 
 ```bash
 curl -X PUT "https://<worker-subdomain>.workers.dev/internal/runtime/config" \
@@ -124,15 +126,15 @@ curl -X PUT "https://<worker-subdomain>.workers.dev/internal/runtime/config" \
   --data-binary @runtime/config.json
 ```
 
-## 5. Đồng bộ danh sách deck
+## 5. Sync the deck list
 
-Chạy workflow `Refresh Anki decks` thủ công lần đầu trong GitHub Actions. Workflow này sync collection tạm thời và đưa danh sách deck lên D1.
+Run the `Refresh Anki decks` workflow manually for the first sync. It temporarily syncs the Anki collection and uploads the deck list to D1.
 
-Sau đó Telegram sẽ hiển thị deck trong `/settings` → `Decks`.
+The decks will then appear in Telegram under `/settings` → `Decks`.
 
 ## 6. GitHub Actions reminder
 
-Workflow `Anki reminder` chạy mỗi 5 phút và dùng:
+The `Anki reminder` workflow runs every five minutes and uses:
 
 ```text
 RUNTIME_BACKEND=control_api
@@ -140,7 +142,7 @@ CONTROL_API_URL
 CONTROL_API_TOKEN
 ```
 
-Workflow chỉ có quyền `contents: read`; runtime state được lưu qua control API.
+The workflow only has `contents: read` permission. Runtime state is stored through the control API.
 
 ## Local development
 
@@ -161,12 +163,12 @@ npm ci
 npm run typecheck
 ```
 
-Local Python mặc định dùng `JsonRuntimeRepository`. Chỉ dùng `RUNTIME_BACKEND=control_api` khi đã có Worker/D1 và thiết lập `CONTROL_API_URL`, `CONTROL_API_TOKEN`.
+Locally, Python uses `JsonRuntimeRepository` by default. Use `RUNTIME_BACKEND=control_api` only after the Worker/D1 service is deployed and `CONTROL_API_URL` and `CONTROL_API_TOKEN` are configured.
 
-## Bảo mật và giới hạn
+## Security and limitations
 
-- Không commit Anki credentials, Telegram token, API token hoặc webhook secret.
-- Worker chỉ xử lý đúng chat ID đã cấu hình.
-- Anki credentials chỉ nằm ở GitHub Secrets và không đi qua Worker.
-- Cloudflare Worker không chạy Anki sync; `/status` hiển thị trạng thái sync gần nhất từ GitHub Actions.
-- Official Anki library dùng API nội bộ và đang pin ở `26.8.1`; cần kiểm tra lại khi nâng version.
+- Do not commit Anki credentials, Telegram tokens, API tokens, or webhook secrets.
+- The Worker only processes requests from the configured Telegram chat ID.
+- Anki credentials are stored only in GitHub Actions Secrets and are never sent to the Worker.
+- The Cloudflare Worker does not run Anki sync; `/status` shows the latest sync status reported by GitHub Actions.
+- The official Anki library uses an internal API and is pinned to `26.8.1`. Re-evaluate compatibility before upgrading it.
