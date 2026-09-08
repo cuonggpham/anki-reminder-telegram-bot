@@ -1,11 +1,13 @@
 .venv/
 node_modules/
+.wrangler/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .coverage
 htmlcov/
 .env
+.dev.vars
 .DS_Store
 
 # Local Anki data must never be committed.

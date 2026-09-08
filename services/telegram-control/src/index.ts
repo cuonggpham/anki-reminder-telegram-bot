@@ -237,7 +237,7 @@ async function processCallback(
 }
 
 async function handleInternal(request: Request, env: Env, url: URL): Promise<Response> {
-  if (request.headers.get("Authorization") !== `Bearer ${env.CONTROL_API_TOKEN}`) {
+  if (!env.CONTROL_API_TOKEN || request.headers.get("Authorization") !== `Bearer ${env.CONTROL_API_TOKEN}`) {
     return json({ error: "Unauthorized" }, 401);
   }
 
