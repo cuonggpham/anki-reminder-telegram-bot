@@ -1,0 +1,9 @@
+name = "anki-telegram-control"
+main = "src/index.ts"
+compatibility_date = "2026-09-08"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "anki-reminder"
+database_id = "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID"
+migrations_dir = "migrations"

@@ -1,0 +1,16 @@
+{
+  "name": "anki-telegram-control",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy",
+    "db:migrations:local": "wrangler d1 migrations apply anki-reminder --local",
+    "db:migrations:remote": "wrangler d1 migrations apply anki-reminder --remote"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260908.1",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.129.1"
+  }
+}
