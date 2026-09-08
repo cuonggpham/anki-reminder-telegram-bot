@@ -23,10 +23,12 @@
       const tg = window.Telegram?.WebApp;
       tg?.ready();
       tg?.expand();
-      if (typeof tg?.requestFullscreen === "function") tg.requestFullscreen();
+      // Keep the native Telegram header and safe area. Forcing fullscreen
+      // can hide AnkiWeb login controls in some Telegram clients.
+      // expand() keeps the native safe area intact.
       const target = "https://ankiweb.net/";
       document.getElementById("open").addEventListener("click", () => { window.location.href = target; });
-      window.setTimeout(() => { window.location.href = target; }, 350);
+      window.setTimeout(() => { window.location.href = target; }, 900);
     </script>
   </body>
 </html>
