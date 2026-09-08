@@ -1,7 +1,12 @@
 {
   "enabled": true,
-  "selected_decks": ["*"],
-  "reminder_times": ["07:30", "18:00"],
+  "selected_decks": [
+    "*"
+  ],
+  "reminder_times": [
+    "07:30",
+    "18:00"
+  ],
   "timezone": "Asia/Ho_Chi_Minh",
   "language": "vi-en"
 }
