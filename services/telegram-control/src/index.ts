@@ -91,6 +91,17 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
   }
 
   const update = (await request.json()) as TelegramUpdate;
+  const chatId = getChatId(update);
+  if (chatId !== env.TELEGRAM_CHAT_ID) return json({ ok: true, ignored: true });
+
+  const callback = update.callback_query;
+  if (callback) {
+    if (String(callback.from.id) !== chatId) return json({ ok: true, ignored: true });
+    // Clear Telegram's loading indicator before any D1 operation. D1 can have
+    // transient latency, but it must not make inline buttons appear stuck.
+    await acknowledgeCallback(env, callback.id);
+  }
+
   const inserted = await env.DB.prepare(
     "INSERT OR IGNORE INTO processed_updates (update_id, processed_at) VALUES (?, ?)",
   )
@@ -98,9 +109,6 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
     .run();
 
   if (!inserted.meta.changes) return json({ ok: true, duplicate: true });
-
-  const chatId = getChatId(update);
-  if (chatId !== env.TELEGRAM_CHAT_ID) return json({ ok: true, ignored: true });
 
   try {
     await processUpdate(update, env, chatId);
@@ -118,7 +126,6 @@ async function processUpdate(update: TelegramUpdate, env: Env, chatId: string) {
   const callback = update.callback_query;
   if (callback) {
     if (String(callback.from.id) !== chatId) return;
-    await answerCallback(env, callback.id);
     await processCallback(callback, env, chatId);
     return;
   }
@@ -575,6 +582,16 @@ async function editMessage(env: Env, chatId: string, messageId: number | undefin
 
 async function answerCallback(env: Env, callbackId: string) {
   await telegramCall(env, "answerCallbackQuery", { callback_query_id: callbackId });
+}
+
+async function acknowledgeCallback(env: Env, callbackId: string) {
+  try {
+    await answerCallback(env, callbackId);
+  } catch (error) {
+    // A callback can expire when Telegram retries an old update. Continue with
+    // the idempotent processing path instead of making every button unusable.
+    console.warn("Telegram callback acknowledgement failed", error);
+  }
 }
 
 async function telegramCall(env: Env, method: string, payload: object) {
