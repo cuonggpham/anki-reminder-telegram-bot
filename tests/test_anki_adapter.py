@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 
 from anki_reminder_bot.adapters.anki.official import AnkiSyncError, OfficialAnkiAdapter
@@ -53,3 +55,29 @@ def test_parent_deck_expands_to_subdecks():
         "English::Advanced",
         "English::Beginner",
     ]
+
+
+def test_virtual_parent_deck_expands_to_subdecks():
+    decks = ["Language::English::Beginner", "Language::English::Advanced"]
+    assert OfficialAnkiAdapter._expand_selected_decks(["Language"], decks) == [
+        "Language::English::Advanced",
+        "Language::English::Beginner",
+    ]
+
+
+def test_virtual_parent_deck_is_valid_for_stats_queries():
+    class _StatsCollection:
+        def find_cards(self, _query):
+            return []
+
+    adapter = OfficialAnkiAdapter("email", "password", "Asia/Ho_Chi_Minh")
+    stats = adapter._read_stats(
+        _StatsCollection(),
+        ["Language"],
+        ["Language::English::Beginner", "Language::English::Advanced"],
+        datetime.fromisoformat("2026-09-10T08:00:00+07:00"),
+    )
+    assert stats.deck_names == (
+        "Language::English::Advanced",
+        "Language::English::Beginner",
+    )

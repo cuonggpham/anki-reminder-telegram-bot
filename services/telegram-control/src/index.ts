@@ -51,6 +51,13 @@ interface RuntimeState {
   lastSyncAt: string | null;
 }
 
+interface DeckNode {
+  name: string;
+  parent: string | null;
+  label: string;
+  hasChildren: boolean;
+}
+
 const ALL_DECKS = "*";
 const DEFAULT_TIMES = ["08:00", "18:00"];
 const MAX_DECKS_PER_PAGE = 12;
@@ -192,24 +199,33 @@ async function processCallback(
     await saveSettings(env.DB, settings);
     await editSettings(env, chatId, messageId);
   } else if (data === "settings:decks") {
-    await editDecks(env, chatId, messageId, 0);
+    await editDecks(env, chatId, messageId, "root", 0);
+  } else if (data.startsWith("decks:view:")) {
+    const [scopeId, pageText] = data.slice("decks:view:".length).split(":");
+    await editDecks(env, chatId, messageId, scopeId || "root", Number(pageText) || 0);
   } else if (data.startsWith("decks:page:")) {
-    await editDecks(env, chatId, messageId, Number(data.split(":")[2]) || 0);
+    // Support buttons from the previous flat deck menu until users open a new one.
+    await editDecks(env, chatId, messageId, "root", Number(data.split(":")[2]) || 0);
   } else if (data === "decks:all") {
     const settings = await loadSettings(env.DB, chatId);
     settings.selectedDecks = [ALL_DECKS];
     await saveSettings(env.DB, settings);
-    await editDecks(env, chatId, messageId, 0);
+    await editDecks(env, chatId, messageId, "root", 0);
   } else if (data.startsWith("decks:toggle:")) {
-    const index = Number(data.split(":")[2]);
     const decks = await listDecks(env.DB);
-    const selected = decks[index];
+    const callbackParts = data.slice("decks:toggle:".length).split(":");
+    const nodeId = Number(callbackParts[0]);
+    const scopeId = callbackParts[1] || "root";
+    const page = Number(callbackParts[2]) || 0;
+    const nodes = buildDeckNodes(decks);
+    // A legacy button only contains the old flat-list index.
+    const selected = callbackParts.length === 1 ? decks[nodeId] : nodes[nodeId]?.name;
     if (selected) {
       const settings = await loadSettings(env.DB, chatId);
       settings.selectedDecks = toggleDeck(settings.selectedDecks, selected);
       await saveSettings(env.DB, settings);
     }
-    await editDecks(env, chatId, messageId, Math.floor(index / MAX_DECKS_PER_PAGE));
+    await editDecks(env, chatId, messageId, scopeId, page);
   } else if (data === "decks:done") {
     await editSettings(env, chatId, messageId);
   } else if (data === "settings:times") {
@@ -467,27 +483,91 @@ async function statusText(db: D1Database, chatId: string): Promise<string> {
   return `📊 Trạng thái gần nhất / Latest status\n\nLast sync: ${state.lastSyncAt ?? "Chưa có / Not yet"}\n\nDữ liệu được cập nhật bởi GitHub Actions. / Data is updated by GitHub Actions.`;
 }
 
-async function editDecks(env: Env, chatId: string, messageId: number | undefined, page: number) {
+async function editDecks(
+  env: Env,
+  chatId: string,
+  messageId: number | undefined,
+  scopeId: string,
+  page: number,
+) {
   const decks = await listDecks(env.DB);
+  const nodes = buildDeckNodes(decks);
   const settings = await loadSettings(env.DB, chatId);
-  const totalPages = Math.max(1, Math.ceil(decks.length / MAX_DECKS_PER_PAGE));
+  const scope = findDeckScope(nodes, scopeId);
+  const visibleNodes = nodes.filter((node) => node.parent === (scope?.name ?? null));
+  const totalPages = Math.max(1, Math.ceil(visibleNodes.length / MAX_DECKS_PER_PAGE));
   const safePage = Math.min(Math.max(page, 0), totalPages - 1);
   const start = safePage * MAX_DECKS_PER_PAGE;
-  const visible = decks.slice(start, start + MAX_DECKS_PER_PAGE);
-  const rows = visible.map((deck, offset) => {
-    const index = start + offset;
-    const marker = settings.selectedDecks.includes(deck) ? "✅" : "⬜";
-    return [{ text: `${marker} ${deck}`, callback_data: `decks:toggle:${index}` }];
-  });
-  rows.unshift([{ text: settings.selectedDecks.includes(ALL_DECKS) ? "✅ All decks" : "⬜ All decks", callback_data: "decks:all" }]);
+  const visible = visibleNodes.slice(start, start + MAX_DECKS_PER_PAGE);
+  const rows: { text: string; callback_data: string }[][] = [];
+
+  if (scope) {
+    rows.push([{ text: "← Back / Quay lại", callback_data: `decks:view:${parentScopeId(nodes, scope)}:0` }]);
+  } else {
+    rows.push([{ text: settings.selectedDecks.includes(ALL_DECKS) ? "✅ All decks" : "⬜ All decks", callback_data: "decks:all" }]);
+  }
+
+  for (const node of visible) {
+    const nodeId = nodes.findIndex((candidate) => candidate.name === node.name);
+    const marker = settings.selectedDecks.includes(node.name) ? "✅" : "⬜";
+    const row = [{
+      text: `${marker} ${node.label}`,
+      callback_data: `decks:toggle:${nodeId}:${scopeId}:${safePage}`,
+    }];
+    if (node.hasChildren) {
+      row.push({ text: "›", callback_data: `decks:view:${nodeId}:0` });
+    }
+    rows.push(row);
+  }
+
   const navigation: { text: string; callback_data: string }[] = [];
-  if (safePage > 0) navigation.push({ text: "◀️", callback_data: `decks:page:${safePage - 1}` });
-  navigation.push({ text: `${safePage + 1}/${totalPages}`, callback_data: `decks:page:${safePage}` });
-  if (safePage + 1 < totalPages) navigation.push({ text: "▶️", callback_data: `decks:page:${safePage + 1}` });
-  rows.push(navigation);
+  if (safePage > 0) navigation.push({ text: "◀️", callback_data: `decks:view:${scopeId}:${safePage - 1}` });
+  navigation.push({ text: `${safePage + 1}/${totalPages}`, callback_data: `decks:view:${scopeId}:${safePage}` });
+  if (safePage + 1 < totalPages) navigation.push({ text: "▶️", callback_data: `decks:view:${scopeId}:${safePage + 1}` });
+  if (navigation.length > 1) rows.push(navigation);
   rows.push([{ text: "✅ Done / Xong", callback_data: "decks:done" }]);
-  const text = decks.length ? "🗂 Chọn deck / Select decks" : "🗂 Chưa có danh sách deck. Chạy deck sync trước. / No decks yet. Run deck sync first.";
+  const text = decks.length
+    ? `🗂 Chọn deck / Select decks\n\n${scope ? deckBreadcrumb(scope.name) : "Deck gốc / Top-level decks"}\nChạm ô để chọn, chạm › để mở subdeck.\nTap checkbox to select, › to open subdecks.`
+    : "🗂 Chưa có danh sách deck. Chạy deck sync trước. / No decks yet. Run deck sync first.";
   await editMessage(env, chatId, messageId, text, { inline_keyboard: rows });
+}
+
+function buildDeckNodes(decks: string[]): DeckNode[] {
+  const names = new Set<string>();
+  for (const deck of decks) {
+    const parts = deck.split("::").filter(Boolean);
+    for (let depth = 1; depth <= parts.length; depth += 1) {
+      names.add(parts.slice(0, depth).join("::"));
+    }
+  }
+  const sortedNames = [...names].sort();
+  return sortedNames.map((name) => ({
+    name,
+    parent: deckParent(name),
+    label: name.split("::").at(-1) ?? name,
+    hasChildren: sortedNames.some((candidate) => deckParent(candidate) === name),
+  }));
+}
+
+function findDeckScope(nodes: DeckNode[], scopeId: string): DeckNode | null {
+  if (scopeId === "root") return null;
+  const index = Number(scopeId);
+  return Number.isInteger(index) && index >= 0 ? nodes[index] ?? null : null;
+}
+
+function parentScopeId(nodes: DeckNode[], node: DeckNode): string {
+  if (!node.parent) return "root";
+  const index = nodes.findIndex((candidate) => candidate.name === node.parent);
+  return index >= 0 ? String(index) : "root";
+}
+
+function deckParent(name: string): string | null {
+  const separator = name.lastIndexOf("::");
+  return separator < 0 ? null : name.slice(0, separator);
+}
+
+function deckBreadcrumb(name: string): string {
+  return name.replaceAll("::", " › ");
 }
 
 async function editTimes(env: Env, chatId: string, messageId: number | undefined) {

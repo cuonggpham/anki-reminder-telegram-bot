@@ -94,7 +94,12 @@ class OfficialAnkiAdapter:
     def _read_stats(
         self, collection, selected_decks: list[str], all_decks: list[str], now: datetime
     ) -> AnkiStats:
-        missing = [name for name in selected_decks if name != ALL_DECKS and name not in all_decks]
+        missing = [
+            name
+            for name in selected_decks
+            if name != ALL_DECKS
+            and not any(deck == name or deck.startswith(f"{name}::") for deck in all_decks)
+        ]
         if missing:
             raise AnkiSyncError(f"Configured deck not found: {', '.join(missing)}")
         expanded = self._expand_selected_decks(selected_decks, all_decks)

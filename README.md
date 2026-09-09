@@ -29,7 +29,7 @@ GitHub Actions + Python + official anki package
 ## Features
 
 - Single-user access restricted to the configured `TELEGRAM_CHAT_ID`.
-- Support for all decks, individual decks, multiple decks, and parent decks including subdecks.
+- Support for all decks, individual decks, multiple decks, and parent decks including subdecks, selected through a hierarchical deck browser.
 - Up to five reminders per day with custom `HH:MM` times.
 - Real-time configuration through Telegram inline keyboards.
 - Vietnamese/English bilingual messages.
